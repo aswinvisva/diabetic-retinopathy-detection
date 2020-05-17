@@ -1,4 +1,4 @@
-from detector_model import Detector
+from diagnosis_pipeline.detector_model import Detector
 
 if __name__ == '__main__':
     dct = Detector(should_load_model=True)

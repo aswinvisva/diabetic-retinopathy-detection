@@ -3,7 +3,6 @@ import re
 
 import cv2
 import pandas as pd
-import tensorflow as tf
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
 
@@ -17,8 +16,7 @@ from tensorflow.keras.layers import Dropout
 import numpy as np
 from tensorflow.python.keras.layers import Flatten
 
-
-import image_generator
+from diagnosis_pipeline import image_generator
 
 
 class Detector:
@@ -67,18 +65,25 @@ class Detector:
 
             self.model.compile(optimizer='rmsprop', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
         else:
-            self.model = load_model('detector_model.h5')
+            self.model = load_model('diagnosis_pipeline/detector_model.h5')
 
         self.model.summary()
 
     def train(self):
         self.model.fit(x=self.gen.generate(), epochs=100, steps_per_epoch=75)
-        save_model(self.model, 'detector_model.h5')
+        save_model(self.model, 'diagnosis_pipeline/detector_model.h5')
 
     def evaluate(self):
         self.gen.generate()
         return self.model.evaluate(x=self.gen.evaluate())
 
+    def image_preprocessing(self, image):
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        image = cv2.resize(image, (224, 224))
+        image = cv2.addWeighted(image, 4, cv2.GaussianBlur(image, (0, 0), 224 / 10), -4,
+                                128)  # the trick is to add this line
+
+        return image
     def show_predictions(self):
         train_df = pd.read_csv('train.csv')
 

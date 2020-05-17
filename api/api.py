@@ -28,7 +28,7 @@ def api_diagnosis():
     session = InteractiveSession(config=config)
 
     data = {"success": False}
-    model = load_model('../detector_model.h5')
+    model = load_model('../diagnosis_pipeline/detector_model.h5')
     model.compile(optimizer='rmsprop', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
 
@@ -36,8 +36,6 @@ def api_diagnosis():
     if flask.request.method == "POST":
 
         if flask.request.files.get("image"):
-            print("Diagnosis API called!")
-
             # read the image in PIL format
             image = flask.request.files["image"].read()
             image = Image.open(io.BytesIO(image))

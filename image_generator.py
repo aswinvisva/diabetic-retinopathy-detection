@@ -6,8 +6,6 @@ import pandas as pd
 import numpy as np
 import cv2
 
-from sklearn.model_selection import train_test_split
-
 
 class Generator:
 
@@ -15,8 +13,6 @@ class Generator:
         self.train = []
         self.test = []
 
-    def generate(self):
-        train_df = pd.read_csv('train.csv')
         paths = []
 
         for root, dirs, files in os.walk('gaussian_filtered_images'):
@@ -32,6 +28,9 @@ class Generator:
 
         self.train = paths[300:]
         self.test = paths[:300]
+
+    def generate(self):
+        train_df = pd.read_csv('train.csv')
 
         for path in self.train:
             mat = cv2.imread(path)

@@ -1,6 +1,7 @@
 import os
 import random
 import re
+from collections import Counter
 
 import pandas as pd
 import numpy as np
@@ -12,6 +13,7 @@ class Generator:
     def __init__(self):
         self.train = []
         self.test = []
+        self.split = 0.85
 
         paths = []
 
@@ -24,10 +26,10 @@ class Generator:
                 paths.append(file_path)
 
         random.shuffle(paths)
-        print(len(paths))
+        split_index = int((1-self.split) * len(paths))
 
-        self.train = paths[300:]
-        self.test = paths[:300]
+        self.train = paths[split_index:]
+        self.test = paths[:split_index]
 
     def generate(self):
         train_df = pd.read_csv('train.csv')

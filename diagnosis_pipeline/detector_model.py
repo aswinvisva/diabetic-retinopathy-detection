@@ -5,23 +5,20 @@ import cv2
 import pandas as pd
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
-
-from tensorflow.keras.models import save_model
-from tensorflow.keras.models import load_model
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D
-from tensorflow.keras.layers import MaxPooling2D
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import Dropout
+from tensorflow.keras import applications
+from tensorflow.keras import Model
+from tensorflow.keras.models import *
+from tensorflow.keras.layers import *
+from tensorflow.keras.optimizers import *
 import numpy as np
-from tensorflow.python.keras.layers import Flatten
+from tensorflow.python.keras.layers import Flatten, GlobalAveragePooling2D
 
 from diagnosis_pipeline import image_generator
 
 
 class Detector:
 
-    def __init__(self, input_size=(224,224,3), should_load_model=False):
+    def __init__(self, input_size=(224,224,3), should_load_model=False, use_resnet=False):
         config = ConfigProto()
         config.gpu_options.allow_growth = True
         session = InteractiveSession(config=config)
@@ -30,38 +27,75 @@ class Detector:
         self.input_size = input_size
 
         if not should_load_model:
-            self.model = Sequential()
 
-            self.model.add(Conv2D(8, 3, input_shape=self.input_size, activation='relu', padding='same', kernel_initializer='he_normal'))
-            self.model.add(Conv2D(8, 3, activation='relu', padding='same', kernel_initializer='he_normal'))
+            if not use_resnet:
 
-            self.model.add(MaxPooling2D((2,2)))
-            self.model.add(Dropout(0.2))
+                inputs = Input(input_size)
 
-            self.model.add(Conv2D(16, 3, activation='relu', padding='same',
-                                  kernel_initializer='he_normal'))
-            self.model.add(Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal'))
+                conv1 = Conv2D(8, 3, input_shape=self.input_size, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)
+                conv2 = Conv2D(8, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)
+                merge1 = concatenate([conv1, conv2], axis=3)
 
-            self.model.add(MaxPooling2D((2, 2)))
-            self.model.add(Dropout(0.2))
+                mp1 = MaxPooling2D((2,2))(merge1)
+                drop1 = Dropout(0.2)(mp1)
 
-            self.model.add(Conv2D(32, 3, activation='relu', padding='same',
-                                  kernel_initializer='he_normal'))
-            self.model.add(Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal'))
+                conv3 = Conv2D(8, 3, activation='relu', padding='same',
+                                      kernel_initializer='he_normal')(drop1)
+                conv4 = Conv2D(8, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv3)
+                merge2 = concatenate([conv3, conv4], axis=3)
 
-            self.model.add(MaxPooling2D((2, 2)))
-            self.model.add(Dropout(0.2))
 
-            self.model.add(Conv2D(64, 3, activation='relu', padding='same',
-                                  kernel_initializer='he_normal'))
-            self.model.add(Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal'))
+                mp2 = MaxPooling2D((2, 2))(merge2)
+                drop2 = Dropout(0.35)(mp2)
+                conv5 = Conv2D(16, 3, activation='relu', padding='same',
+                                      kernel_initializer='he_normal')(drop2)
+                conv6 = Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv5)
+                merge3 = concatenate([conv5, conv6], axis=3)
 
-            self.model.add(MaxPooling2D((2, 2)))
+                mp3 = MaxPooling2D((2, 2))(merge3)
 
-            self.model.add(Dropout(0.2))
-            self.model.add(Flatten())
+                conv7 = Conv2D(16, 3, activation='relu', padding='same',
+                                      kernel_initializer='he_normal')(mp3)
+                conv8 = Conv2D(16, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv7)
+                merge3 = concatenate([conv7, conv8], axis=3)
 
-            self.model.add(Dense(5, activation='softmax'))
+                conv9 = Conv2D(32, 3, activation='relu', padding='same',
+                               kernel_initializer='he_normal')(merge3)
+                conv10 = Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv9)
+                merge4 = concatenate([conv9, conv10], axis=3)
+
+                mp4 = MaxPooling2D((2, 2))(merge4)
+
+                conv11 = Conv2D(32, 3, activation='relu', padding='same',
+                               kernel_initializer='he_normal')(mp4)
+                conv12 = Conv2D(32, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv11)
+                merge5 = concatenate([conv11, conv12], axis=3)
+
+                conv13 = Conv2D(64, 3, activation='relu', padding='same',
+                               kernel_initializer='he_normal')(merge5)
+                conv14 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv13)
+                merge6 = concatenate([conv13, conv14], axis=3)
+
+                conv15 = Conv2D(64, 3, activation='relu', padding='same',
+                                kernel_initializer='he_normal')(merge6)
+                conv16 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv15)
+                merge7 = concatenate([conv15, conv16], axis=3)
+
+                mp5 = MaxPooling2D((2, 2))(merge7)
+
+                drop4 = Dropout(0.45)(mp5)
+                flat = Flatten()(drop4)
+
+                dense1 = Dense(5, activation='softmax')(flat)
+                self.model = Model(inputs, dense1)
+            else:
+                base_model = applications.resnet50.ResNet50(weights=None, include_top=False,
+                                                            input_shape=(224, 224, 3))
+                x = base_model.output
+                x = GlobalAveragePooling2D()(x)
+                x = Dropout(0.7)(x)
+                predictions = Dense(5, activation='softmax')(x)
+                self.model = Model(inputs=base_model.input, outputs=predictions)
 
             self.model.compile(optimizer='rmsprop', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
         else:

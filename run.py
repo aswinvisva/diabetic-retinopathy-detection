@@ -29,4 +29,4 @@ def evaluate():
     print(dct.evaluate())
 
 if __name__ == '__main__':
-    show_prediction()
+    evaluate()

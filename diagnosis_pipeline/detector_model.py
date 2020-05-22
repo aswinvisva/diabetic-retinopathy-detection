@@ -7,10 +7,15 @@ from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
 from tensorflow.keras import applications
 from tensorflow.keras import Model
+from tensorflow.keras.applications import resnet50, inception_v3
 from tensorflow.keras.models import *
 from tensorflow.keras.layers import *
 from tensorflow.keras.optimizers import *
 import numpy as np
+from tensorflow.python.keras.applications import vgg16
+from tensorflow.python.keras.applications.inception_v3 import InceptionV3
+from tensorflow.python.keras.applications.resnet import ResNet50
+from tensorflow.python.keras.applications.vgg16 import VGG16
 from tensorflow.python.keras.layers import Flatten, GlobalAveragePooling2D
 
 from diagnosis_pipeline import image_generator
@@ -18,12 +23,12 @@ from diagnosis_pipeline import image_generator
 
 class Detector:
 
-    def __init__(self, input_size=(224,224,3), should_load_model=False, use_resnet=False):
+    def __init__(self, input_size=(224,224,1), should_load_model=False, use_resnet=False, train_split=0.85):
         config = ConfigProto()
         config.gpu_options.allow_growth = True
         session = InteractiveSession(config=config)
 
-        self.gen = image_generator.Generator()
+        self.gen = image_generator.Generator(train_split)
         self.input_size = input_size
 
         if not should_load_model:
@@ -89,15 +94,18 @@ class Detector:
                 dense1 = Dense(5, activation='softmax')(flat)
                 self.model = Model(inputs, dense1)
             else:
-                base_model = applications.resnet50.ResNet50(weights=None, include_top=False,
-                                                            input_shape=(224, 224, 3))
-                x = base_model.output
-                x = GlobalAveragePooling2D()(x)
-                x = Dropout(0.7)(x)
+                base_model = InceptionV3(include_top=False, weights="imagenet", input_shape=(224, 224, 3))
+
+                for layer in base_model.layers:
+                    layer.trainable = False
+
+                x = Flatten()(base_model.output)
+                # x = Dense(112, activation='relu')(x)
+                x = Dropout(0.25)(x)
                 predictions = Dense(5, activation='softmax')(x)
                 self.model = Model(inputs=base_model.input, outputs=predictions)
 
-            self.model.compile(optimizer='rmsprop', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+            self.model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['sparse_categorical_accuracy'])
         else:
             self.model = load_model('diagnosis_pipeline/detector_model.h5')
 
@@ -108,21 +116,16 @@ class Detector:
         save_model(self.model, 'diagnosis_pipeline/detector_model.h5')
 
     def evaluate(self):
-        self.gen.generate()
         return self.model.evaluate(x=self.gen.evaluate())
 
-    def image_preprocessing(self, image):
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        image = cv2.resize(image, (224, 224))
-        image = cv2.addWeighted(image, 4, cv2.GaussianBlur(image, (0, 0), 224 / 10), -4,
-                                128)  # the trick is to add this line
-
-        return image
     def show_predictions(self):
         train_df = pd.read_csv('train.csv')
 
         for path in self.gen.test:
             mat = cv2.imread(path)
+            mat = cv2.resize(mat, (224, 224))
+            mat = inception_v3.preprocess_input(mat)
+
             id = re.search("(.*?)\.", os.path.basename(path)).group(1)
 
             label = train_df[train_df['id_code'] == id]['diagnosis'].values[0]

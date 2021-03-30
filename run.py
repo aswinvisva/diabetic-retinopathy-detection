@@ -4,7 +4,7 @@ def k_fold_cross_validation(k=15):
     k_fold_cross_validation_list = []
 
     for i in range(k):
-        dct = Detector(train_split=0.85)
+        dct = Detector(train_split=0.99)
         dct.train()
         results = dct.evaluate()
         accuracy = results[1]
@@ -15,10 +15,11 @@ def k_fold_cross_validation(k=15):
     return average
 
 def train():
-    dct = Detector(train_split=0.85, use_resnet=True)
+    dct = Detector(train_split=0.99, use_transfer_learning_ensemble=True)
     dct.train()
     results = dct.evaluate()
     print(results)
+    dct.show_predictions()
 
 def show_prediction():
     dct = Detector(should_load_model=True)
@@ -29,4 +30,4 @@ def evaluate():
     print(dct.evaluate())
 
 if __name__ == '__main__':
-    evaluate()
+    train()
